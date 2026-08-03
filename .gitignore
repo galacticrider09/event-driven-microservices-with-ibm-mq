@@ -1,0 +1,23 @@
+# IntelliJ
+.idea/
+*.iml
+
+# Maven
+target/
+
+# Logs
+*.log
+mqjms.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+.env
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.tfstate.lock.info
+.terraform.lock.hcl

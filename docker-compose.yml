@@ -1,0 +1,213 @@
+services:
+
+  # ===========================
+  # PostgreSQL Databases
+  # ===========================
+
+  order-producer-db:
+    image: postgres:13
+    container_name: order-producer-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - producer_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d order_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  order-inventory-db:
+    image: postgres:13
+    container_name: order-inventory-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - inventory_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d inventory_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  order-payment-db:
+    image: postgres:13
+    container_name: order-payment-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5434:5432"
+    volumes:
+      - payment_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d payment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  order-notification-db:
+    image: postgres:13
+    container_name: order-notification-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5435:5432"
+    volumes:
+      - notification_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d notification_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================
+  # IBM MQ (messaging backbone)
+  # ===========================
+
+  ibm-mq:
+    image: icr.io/ibm-messaging/mq:latest
+    container_name: ibm-mq
+    restart: unless-stopped
+    environment:
+      - LICENSE=accept
+      - MQ_QMGR_NAME=QM1
+      - MQ_APP_PASSWORD=${MQ_PASSWORD}
+      - MQ_ADMIN_PASSWORD=${MQ_ADMIN_PASSWORD}
+    ports:
+      - "1414:1414"
+      - "9443:9443"
+    volumes:
+      - mq_data:/mnt/mqm
+      - ./mq-config/20-queues.mqsc:/etc/mqm/20-queues.mqsc:ro
+    healthcheck:
+      test: ["CMD", "dspmq", "-m", "QM1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ===========================
+  # Microservices
+  # ===========================
+
+  order-producer-service:
+    build:
+      context: ./order-producer-service
+      dockerfile: Dockerfile
+    container_name: order-producer-service
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - JAVA_TOOL_OPTIONS=-Duser.timezone=UTC
+      - MQ_HOST=ibm-mq
+      - DB_HOST=order-producer-db
+      - MQ_USER=${MQ_USER}
+      - MQ_PASSWORD=${MQ_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      order-producer-db:
+        condition: service_healthy
+      ibm-mq:
+        condition: service_healthy
+
+  order-inventory-service:
+    build:
+      context: ./order-inventory-service
+      dockerfile: Dockerfile
+    container_name: order-inventory-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - JAVA_TOOL_OPTIONS=-Duser.timezone=UTC
+      - MQ_HOST=ibm-mq
+      - DB_HOST=order-inventory-db
+      - DB_PORT=5432
+      - MQ_USER=${MQ_USER}
+      - MQ_PASSWORD=${MQ_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      order-inventory-db:
+        condition: service_healthy
+      ibm-mq:
+        condition: service_healthy
+
+  order-payment-service:
+    build:
+      context: ./order-payment-service
+      dockerfile: Dockerfile
+    container_name: order-payment-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - JAVA_TOOL_OPTIONS=-Duser.timezone=UTC
+      - MQ_HOST=ibm-mq
+      - DB_HOST=order-payment-db
+      - DB_PORT=5432
+      - MQ_USER=${MQ_USER}
+      - MQ_PASSWORD=${MQ_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      order-payment-db:
+        condition: service_healthy
+      ibm-mq:
+        condition: service_healthy
+
+  order-notification-service:
+    build:
+      context: ./order-notification-service
+      dockerfile: Dockerfile
+    container_name: order-notification-service
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      - JAVA_TOOL_OPTIONS=-Duser.timezone=UTC
+      - MQ_HOST=ibm-mq
+      - DB_HOST=order-notification-db
+      - DB_PORT=5432
+      - MQ_USER=${MQ_USER}
+      - MQ_PASSWORD=${MQ_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      order-notification-db:
+        condition: service_healthy
+      ibm-mq:
+        condition: service_healthy
+
+volumes:
+  producer_db_data:
+  inventory_db_data:
+  payment_db_data:
+  notification_db_data:
+  mq_data:

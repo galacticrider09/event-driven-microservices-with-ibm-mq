@@ -1,0 +1,34 @@
+* ===================================================================
+* Order Saga Pipeline - Queue Definitions
+* Auto-executed by the IBM MQ dev container on queue manager start.
+* This is what was missing after the debezium-config folder (which
+* used to hold this same file) was removed - the app kept referencing
+* queues that no longer existed, which is what produced the MQRC
+* "unknown object" style errors.
+* ===================================================================
+
+* --- Pipeline queues (one hop per arrow) ---
+DEFINE QLOCAL('DEV.ORDER.QUEUE') REPLACE DEFPSIST(YES)
+DEFINE QLOCAL('DEV.PAYMENT.QUEUE') REPLACE DEFPSIST(YES)
+DEFINE QLOCAL('DEV.NOTIFICATION.QUEUE') REPLACE DEFPSIST(YES)
+
+* --- Status-return queues (consumed back by the Producer) ---
+DEFINE QLOCAL('DEV.ORDER.FAILED.QUEUE') REPLACE DEFPSIST(YES)
+DEFINE QLOCAL('DEV.ORDER.COMPLETED.QUEUE') REPLACE DEFPSIST(YES)
+
+* --- Compensation queue (Inventory releases stock if Payment fails) ---
+DEFINE QLOCAL('DEV.INVENTORY.COMPENSATE.QUEUE') REPLACE DEFPSIST(YES)
+
+* --- Dead letter queue ---
+DEFINE QLOCAL('DEV.DEAD.LETTER.QUEUE') REPLACE DEFPSIST(YES)
+
+* --- Grant the app user full access to every queue above ---
+SET AUTHREC PROFILE('DEV.ORDER.QUEUE') OBJTYPE(QUEUE) PRINCIPAL('app') AUTHADD(ALLMQI)
+SET AUTHREC PROFILE('DEV.PAYMENT.QUEUE') OBJTYPE(QUEUE) PRINCIPAL('app') AUTHADD(ALLMQI)
+SET AUTHREC PROFILE('DEV.NOTIFICATION.QUEUE') OBJTYPE(QUEUE) PRINCIPAL('app') AUTHADD(ALLMQI)
+SET AUTHREC PROFILE('DEV.ORDER.FAILED.QUEUE') OBJTYPE(QUEUE) PRINCIPAL('app') AUTHADD(ALLMQI)
+SET AUTHREC PROFILE('DEV.ORDER.COMPLETED.QUEUE') OBJTYPE(QUEUE) PRINCIPAL('app') AUTHADD(ALLMQI)
+SET AUTHREC PROFILE('DEV.INVENTORY.COMPENSATE.QUEUE') OBJTYPE(QUEUE) PRINCIPAL('app') AUTHADD(ALLMQI)
+SET AUTHREC PROFILE('DEV.DEAD.LETTER.QUEUE') OBJTYPE(QUEUE) PRINCIPAL('app') AUTHADD(ALLMQI)
+
+REFRESH SECURITY(*)

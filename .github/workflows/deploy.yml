@@ -1,0 +1,87 @@
+name: Deploy to ECS Fargate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'order-producer-service/**'
+      - 'order-inventory-service/**'
+      - 'order-payment-service/**'
+      - 'order-notification-service/**'
+
+permissions:
+  id-token: write # Required for AWS OIDC authentication
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  ECS_CLUSTER: order-saga-cluster
+  # Ensure you create an OIDC Identity Provider and Role in AWS IAM first!
+  # See: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+  AWS_ROLE_ARN: arn:aws:iam::123456789012:role/github-actions-order-saga-role
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build Producer Service
+        working-directory: ./order-producer-service
+        run: |
+          mvn clean package -DskipTests
+          docker build -t order-saga-producer .
+          docker tag order-saga-producer:latest ${{ steps.login-ecr.outputs.registry }}/order-saga-producer:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/order-saga-producer:latest
+
+      - name: Build Inventory Service
+        working-directory: ./order-inventory-service
+        run: |
+          mvn clean package -DskipTests
+          docker build -t order-saga-inventory .
+          docker tag order-saga-inventory:latest ${{ steps.login-ecr.outputs.registry }}/order-saga-inventory:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/order-saga-inventory:latest
+
+      - name: Build Payment Service
+        working-directory: ./order-payment-service
+        run: |
+          mvn clean package -DskipTests
+          docker build -t order-saga-payment .
+          docker tag order-saga-payment:latest ${{ steps.login-ecr.outputs.registry }}/order-saga-payment:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/order-saga-payment:latest
+
+      - name: Build Notification Service
+        working-directory: ./order-notification-service
+        run: |
+          mvn clean package -DskipTests
+          docker build -t order-saga-notification .
+          docker tag order-saga-notification:latest ${{ steps.login-ecr.outputs.registry }}/order-saga-notification:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/order-saga-notification:latest
+
+      - name: Force ECS Deployments
+        run: |
+          aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service order-saga-producer-service --force-new-deployment > /dev/null
+          aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service order-saga-inventory-service --force-new-deployment > /dev/null
+          aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service order-saga-payment-service --force-new-deployment > /dev/null
+          aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service order-saga-notification-service --force-new-deployment > /dev/null
+          echo "Triggered rolling deployments for all services!"
