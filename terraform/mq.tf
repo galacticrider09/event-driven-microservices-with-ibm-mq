@@ -57,6 +57,24 @@ resource "aws_instance" "mq" {
       -p 1414:1414 -p 9443:9443 \
       -v /mnt/mqm:/mnt/mqm \
       icr.io/ibm-messaging/mq:latest
+
+    # Wait for MQ to start and create queues automatically
+    cat << 'MQSC' > /tmp/queues.mqsc
+DEFINE QLOCAL(DEV.ORDER.QUEUE) REPLACE
+DEFINE QLOCAL(DEV.ORDER.FAILED.QUEUE) REPLACE
+DEFINE QLOCAL(DEV.ORDER.COMPLETED.QUEUE) REPLACE
+DEFINE QLOCAL(DEV.PAYMENT.QUEUE) REPLACE
+DEFINE QLOCAL(DEV.NOTIFICATION.QUEUE) REPLACE
+DEFINE QLOCAL(DEV.INVENTORY.COMPENSATE.QUEUE) REPLACE
+MQSC
+
+    (
+      until docker exec ibm-mq dspmq | grep -q "Status(Running)"; do
+        sleep 5
+      done
+      docker cp /tmp/queues.mqsc ibm-mq:/tmp/queues.mqsc
+      docker exec ibm-mq runmqsc QM1 -f /tmp/queues.mqsc
+    ) &
   EOF
 
   tags = { Name = "order-saga-mq" }

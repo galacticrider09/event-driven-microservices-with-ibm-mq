@@ -75,7 +75,7 @@ resource "aws_ecs_task_definition" "app" {
   container_definitions = jsonencode([
     {
       name      = "order-saga-${each.key}"
-      image     = "nginx:latest" # Placeholder until first deploy
+      image     = "${aws_ecr_repository.app[each.key].repository_url}:latest"
       essential = true
 
       portMappings = [
@@ -108,10 +108,6 @@ resource "aws_ecs_task_definition" "app" {
       }
     }
   ])
-
-  lifecycle {
-    ignore_changes = [container_definitions] # Let CI/CD manage the exact image tag
-  }
 }
 
 # ECS Services
@@ -136,7 +132,7 @@ resource "aws_ecs_service" "app" {
     container_port   = each.value.port
   }
 
-  health_check_grace_period_seconds = 60
+  health_check_grace_period_seconds = 180
 
   depends_on = [
     aws_lb_listener.http
