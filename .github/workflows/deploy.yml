@@ -50,7 +50,7 @@ jobs:
       - name: Build Producer Service
         working-directory: ./order-producer-service
         run: |
-          mvn clean package -DskipTests
+          mvn clean package -Dmaven.test.skip=true
           docker build -t order-saga-producer .
           docker tag order-saga-producer:latest ${{ steps.login-ecr.outputs.registry }}/order-saga-producer:latest
           docker push ${{ steps.login-ecr.outputs.registry }}/order-saga-producer:latest
@@ -58,7 +58,7 @@ jobs:
       - name: Build Inventory Service
         working-directory: ./order-inventory-service
         run: |
-          mvn clean package -DskipTests
+          mvn clean package -Dmaven.test.skip=true
           docker build -t order-saga-inventory .
           docker tag order-saga-inventory:latest ${{ steps.login-ecr.outputs.registry }}/order-saga-inventory:latest
           docker push ${{ steps.login-ecr.outputs.registry }}/order-saga-inventory:latest
@@ -66,7 +66,7 @@ jobs:
       - name: Build Payment Service
         working-directory: ./order-payment-service
         run: |
-          mvn clean package -DskipTests
+          mvn clean package -Dmaven.test.skip=true
           docker build -t order-saga-payment .
           docker tag order-saga-payment:latest ${{ steps.login-ecr.outputs.registry }}/order-saga-payment:latest
           docker push ${{ steps.login-ecr.outputs.registry }}/order-saga-payment:latest
@@ -74,7 +74,7 @@ jobs:
       - name: Build Notification Service
         working-directory: ./order-notification-service
         run: |
-          mvn clean package -DskipTests
+          mvn clean package -Dmaven.test.skip=true
           docker build -t order-saga-notification .
           docker tag order-saga-notification:latest ${{ steps.login-ecr.outputs.registry }}/order-saga-notification:latest
           docker push ${{ steps.login-ecr.outputs.registry }}/order-saga-notification:latest
