@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/producer")
+@RequestMapping("")
 @CrossOrigin(origins = "http://localhost:3000")
 @Slf4j
 public class ProducerController {
