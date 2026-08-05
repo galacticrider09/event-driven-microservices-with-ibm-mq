@@ -140,6 +140,28 @@ resource "aws_security_group" "mq" {
   }
 
   ingress {
+    description = "SSH access"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.your_ip]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# pgAdmin Security Group
+resource "aws_security_group" "pgadmin" {
+  name        = "order-saga-pgadmin-sg"
+  description = "Security group for pgAdmin on EC2"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
     description = "pgAdmin Web UI"
     from_port   = 5050
     to_port     = 5050
@@ -190,5 +212,13 @@ resource "aws_security_group" "rds" {
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [aws_security_group.mq.id]
+  }
+
+  ingress {
+    description     = "PostgreSQL from pgAdmin host"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.pgadmin.id]
   }
 }
