@@ -35,21 +35,28 @@ resource "aws_instance" "mq" {
 
   user_data = <<-EOF
     #!/bin/bash
-    yum update -y && yum install -y docker
+    set -x
+
+    # 1. Create 2GB swap file FIRST to prevent OOM
+    if [ ! -f /swapfile ]; then
+      dd if=/dev/zero of=/swapfile bs=1M count=2048
+      chmod 600 /swapfile
+      mkswap /swapfile
+      swapon /swapfile
+      echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
+    fi
+
+    # 2. Install and start Docker (Skip yum update -y to prevent locks/hangs)
+    yum install -y docker
     systemctl enable docker && systemctl start docker
 
-    # Create 2GB swap file to prevent OOM on t3.micro
-    dd if=/dev/zero of=/swapfile bs=1M count=2048
-    chmod 600 /swapfile
-    mkswap /swapfile
-    swapon /swapfile
-    echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
-
-    # Mount EBS for IBM MQ persistence
-    mkfs -t xfs /dev/xvdb
+    # 3. Mount EBS for IBM MQ persistence (Idempotent mkfs)
+    blkid /dev/xvdb || mkfs -t xfs /dev/xvdb
     mkdir -p /mnt/mqm
-    mount /dev/xvdb /mnt/mqm
-    echo '/dev/xvdb /mnt/mqm xfs defaults,nofail 0 2' >> /etc/fstab
+    if ! mountpoint -q /mnt/mqm; then
+      mount /dev/xvdb /mnt/mqm
+      grep -q '/mnt/mqm' /etc/fstab || echo '/dev/xvdb /mnt/mqm xfs defaults,nofail 0 2' >> /etc/fstab
+    fi
     mkdir -p /mnt/mqm/data
     chown -R 1001:1001 /mnt/mqm
 

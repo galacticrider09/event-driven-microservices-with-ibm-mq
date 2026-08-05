@@ -15,7 +15,19 @@ resource "aws_instance" "pgadmin" {
 
   user_data = <<-EOF
     #!/bin/bash
-    yum update -y && yum install -y docker
+    set -x
+
+    # 1. Create 2GB swap file FIRST to prevent OOM
+    if [ ! -f /swapfile ]; then
+      dd if=/dev/zero of=/swapfile bs=1M count=2048
+      chmod 600 /swapfile
+      mkswap /swapfile
+      swapon /swapfile
+      echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
+    fi
+
+    # 2. Install and start Docker (Skip yum update -y to prevent locks/hangs)
+    yum install -y docker
     systemctl enable docker && systemctl start docker
 
     # Fetch MQ password from Parameter Store (used for pgadmin login)
