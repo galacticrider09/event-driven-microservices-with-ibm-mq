@@ -140,6 +140,14 @@ resource "aws_security_group" "mq" {
   }
 
   ingress {
+    description = "pgAdmin Web UI"
+    from_port   = 5050
+    to_port     = 5050
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
     description = "SSH access"
     from_port   = 22
     to_port     = 22
@@ -174,5 +182,13 @@ resource "aws_security_group" "rds" {
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [each.value]
+  }
+
+  ingress {
+    description     = "PostgreSQL from MQ Bastion host"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.mq.id]
   }
 }

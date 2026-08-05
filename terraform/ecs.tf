@@ -132,7 +132,7 @@ resource "aws_ecs_service" "app" {
     container_port   = each.value.port
   }
 
-  health_check_grace_period_seconds = 180
+  health_check_grace_period_seconds = 300
 
   depends_on = [
     aws_lb_listener.http

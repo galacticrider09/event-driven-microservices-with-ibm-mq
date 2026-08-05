@@ -21,3 +21,4 @@ Thumbs.db
 *.tfstate.backup
 .terraform.tfstate.lock.info
 .terraform.lock.hcl
+.envudadha

@@ -72,9 +72,15 @@ MQSC
       until docker exec ibm-mq dspmq | grep -q "Status(Running)"; do
         sleep 5
       done
-      docker cp /tmp/queues.mqsc ibm-mq:/tmp/queues.mqsc
-      docker exec ibm-mq runmqsc QM1 -f /tmp/queues.mqsc
+      docker exec -i ibm-mq runmqsc QM1 < /tmp/queues.mqsc
     ) &
+
+    # Run pgAdmin
+    docker run -d --name pgadmin --restart unless-stopped \
+      -e PGADMIN_DEFAULT_EMAIL=admin@ordersaga.com \
+      -e PGADMIN_DEFAULT_PASSWORD=$MQ_ADMIN_PASS \
+      -p 5050:80 \
+      dpage/pgadmin4:latest
   EOF
 
   tags = { Name = "order-saga-mq" }

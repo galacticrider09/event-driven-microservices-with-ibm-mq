@@ -82,6 +82,7 @@ services:
 
   ibm-mq:
     image: icr.io/ibm-messaging/mq:latest
+    platform: linux/amd64
     container_name: ibm-mq
     restart: unless-stopped
     environment:
