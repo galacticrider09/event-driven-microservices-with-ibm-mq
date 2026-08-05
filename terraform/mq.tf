@@ -38,11 +38,19 @@ resource "aws_instance" "mq" {
     yum update -y && yum install -y docker
     systemctl enable docker && systemctl start docker
 
+    # Create 2GB swap file to prevent OOM on t3.micro
+    dd if=/dev/zero of=/swapfile bs=1M count=2048
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
+
     # Mount EBS for IBM MQ persistence
     mkfs -t xfs /dev/xvdb
     mkdir -p /mnt/mqm
     mount /dev/xvdb /mnt/mqm
     echo '/dev/xvdb /mnt/mqm xfs defaults,nofail 0 2' >> /etc/fstab
+    mkdir -p /mnt/mqm/data
     chown -R 1001:1001 /mnt/mqm
 
     # Fetch MQ password from Parameter Store
@@ -69,7 +77,7 @@ DEFINE QLOCAL(DEV.INVENTORY.COMPENSATE.QUEUE) REPLACE
 MQSC
 
     (
-      until docker exec ibm-mq dspmq | grep -q "Status(Running)"; do
+      until docker exec ibm-mq dspmq | grep -qi "status(running)"; do
         sleep 5
       done
       docker exec -i ibm-mq runmqsc QM1 < /tmp/queues.mqsc
