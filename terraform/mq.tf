@@ -33,64 +33,10 @@ resource "aws_instance" "mq" {
     encrypted   = true
   }
 
-  user_data = <<-EOF
-    #!/bin/bash
-    set -x
-
-    # 1. Create 2GB swap file FIRST to prevent OOM
-    if [ ! -f /swapfile ]; then
-      dd if=/dev/zero of=/swapfile bs=1M count=2048
-      chmod 600 /swapfile
-      mkswap /swapfile
-      swapon /swapfile
-      echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
-    fi
-
-    # 2. Install and start Docker (Skip yum update -y to prevent locks/hangs)
-    yum install -y docker
-    systemctl enable docker && systemctl start docker
-
-    # 3. Mount EBS for IBM MQ persistence (Idempotent mkfs)
-    blkid /dev/xvdb || mkfs -t xfs /dev/xvdb
-    mkdir -p /mnt/mqm
-    if ! mountpoint -q /mnt/mqm; then
-      mount /dev/xvdb /mnt/mqm
-      grep -q '/mnt/mqm' /etc/fstab || echo '/dev/xvdb /mnt/mqm xfs defaults,nofail 0 2' >> /etc/fstab
-    fi
-    mkdir -p /mnt/mqm/data
-    chown -R 1001:1001 /mnt/mqm
-
-    # Fetch MQ password from Parameter Store
-    MQ_PASS=$(aws ssm get-parameter --name "/order-saga/MQ_PASSWORD" --with-decryption --region ${var.aws_region} --query "Parameter.Value" --output text)
-    MQ_ADMIN_PASS=$(aws ssm get-parameter --name "/order-saga/MQ_ADMIN_PASSWORD" --with-decryption --region ${var.aws_region} --query "Parameter.Value" --output text)
-
-    # Run IBM MQ
-    docker run -d --name ibm-mq --restart unless-stopped \
-      -e LICENSE=accept -e MQ_QMGR_NAME=QM1 \
-      -e MQ_APP_PASSWORD=$MQ_PASS \
-      -e MQ_ADMIN_PASSWORD=$MQ_ADMIN_PASS \
-      -p 1414:1414 -p 9443:9443 \
-      -v /mnt/mqm:/mnt/mqm \
-      icr.io/ibm-messaging/mq:latest
-
-    # Wait for MQ to start and create queues automatically
-    cat << 'MQSC' > /tmp/queues.mqsc
-DEFINE QLOCAL(DEV.ORDER.QUEUE) REPLACE
-DEFINE QLOCAL(DEV.ORDER.FAILED.QUEUE) REPLACE
-DEFINE QLOCAL(DEV.ORDER.COMPLETED.QUEUE) REPLACE
-DEFINE QLOCAL(DEV.PAYMENT.QUEUE) REPLACE
-DEFINE QLOCAL(DEV.NOTIFICATION.QUEUE) REPLACE
-DEFINE QLOCAL(DEV.INVENTORY.COMPENSATE.QUEUE) REPLACE
-MQSC
-
-    (
-      until docker exec ibm-mq dspmq | grep -qi "status(running)"; do
-        sleep 5
-      done
-      docker exec -i ibm-mq runmqsc QM1 < /tmp/queues.mqsc
-    ) &
-
-  EOF
+  user_data = templatefile("${path.module}/scripts/mq_user_data.sh", {
+    aws_region   = var.aws_region
+    mqsc_content = file("${path.module}/../mq-config/20-queues.mqsc")
+  })
 
   tags = { Name = "order-saga-mq" }
 }
