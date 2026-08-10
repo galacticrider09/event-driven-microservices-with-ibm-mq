@@ -13,9 +13,33 @@ resource "aws_instance" "pgadmin" {
     encrypted   = true
   }
 
-  user_data = templatefile("${path.module}/scripts/pgadmin_user_data.sh", {
-    aws_region = var.aws_region
-  })
+  user_data = <<-EOF
+    #!/bin/bash
+    set -x
+
+    # 1. Create 2GB swap file FIRST to prevent OOM
+    if [ ! -f /swapfile ]; then
+      dd if=/dev/zero of=/swapfile bs=1M count=2048
+      chmod 600 /swapfile
+      mkswap /swapfile
+      swapon /swapfile
+      echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
+    fi
+
+    # 2. Install and start Docker (Skip yum update -y to prevent locks/hangs)
+    yum install -y docker
+    systemctl enable docker && systemctl start docker
+
+    # Fetch MQ password from Parameter Store (used for pgadmin login)
+    MQ_ADMIN_PASS=$(aws ssm get-parameter --name "/order-saga/MQ_ADMIN_PASSWORD" --with-decryption --region ${var.aws_region} --query "Parameter.Value" --output text)
+
+    # Run pgAdmin
+    docker run -d --name pgadmin --restart unless-stopped \
+      -e PGADMIN_DEFAULT_EMAIL=admin@ordersaga.com \
+      -e PGADMIN_DEFAULT_PASSWORD=$MQ_ADMIN_PASS \
+      -p 5050:80 \
+      dpage/pgadmin4:latest
+  EOF
 
   tags = { Name = "order-saga-pgadmin" }
 }

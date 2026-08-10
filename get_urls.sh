@@ -44,7 +44,7 @@ echo "   DATABASE ACCESS (pgAdmin UI)"
 echo "==========================================="
 echo "pgAdmin Web UI: http://$PGADMIN_IP:5050"
 echo "Login Email   : admin@ordersaga.com"
-echo "Login Password: MQ_ADMIN_PASSWORD - check systems manager"
+echo "Login Password: POSTGRES_PASSWORD (check systems manager) "
 echo ""
 echo "Database Hostnames (to enter when adding a server in pgAdmin):"
 PRODUCER_DB=$(terraform output -json rds_endpoints | jq -r '.producer')
