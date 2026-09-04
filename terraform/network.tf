@@ -185,25 +185,23 @@ resource "aws_security_group" "pgadmin" {
   }
 }
 
-# RDS Security Groups (One for each DB)
+# RDS Security Group (single shared instance)
 resource "aws_security_group" "rds" {
-  for_each = {
-    producer     = aws_security_group.ecs["producer"].id
-    inventory    = aws_security_group.ecs["inventory"].id
-    payment      = aws_security_group.ecs["payment"].id
-    notification = aws_security_group.ecs["notification"].id
-  }
-
-  name        = "order-saga-rds-${each.key}-sg"
-  description = "Security group for ${each.key} database"
+  name        = "order-saga-rds-sg"
+  description = "Security group for the shared RDS database"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "PostgreSQL from ${each.key} service"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [each.value]
+    description = "PostgreSQL from all ECS services"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    security_groups = [
+      aws_security_group.ecs["producer"].id,
+      aws_security_group.ecs["inventory"].id,
+      aws_security_group.ecs["payment"].id,
+      aws_security_group.ecs["notification"].id
+    ]
   }
 
   ingress {

@@ -26,20 +26,38 @@ resource "aws_instance" "pgadmin" {
       echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
     fi
 
-    # 2. Install and start Docker (Skip yum update -y to prevent locks/hangs)
-    yum install -y docker
+    # 2. Install Docker and PostgreSQL client tools
+    yum install -y docker postgresql15
     systemctl enable docker && systemctl start docker
 
-    # Fetch MQ password from Parameter Store (used for pgadmin login)
-    MQ_ADMIN_PASS=$(aws ssm get-parameter --name "/order-saga/MQ_ADMIN_PASSWORD" --with-decryption --region ${var.aws_region} --query "Parameter.Value" --output text)
+    # 3. Fetch credentials from Parameter Store
+    REGION="${var.aws_region}"
+    MQ_ADMIN_PASS=$(aws ssm get-parameter --name "/order-saga/MQ_ADMIN_PASSWORD" --with-decryption --region $REGION --query "Parameter.Value" --output text)
+    PG_USER=$(aws ssm get-parameter --name "/order-saga/POSTGRES_USER" --with-decryption --region $REGION --query "Parameter.Value" --output text)
+    PG_PASS=$(aws ssm get-parameter --name "/order-saga/POSTGRES_PASSWORD" --with-decryption --region $REGION --query "Parameter.Value" --output text)
 
-    # Run pgAdmin
+    # 4. Create the 4 logical databases on the single RDS instance
+    #    order_db is already created by RDS as the default db, so we create the other 3.
+    RDS_HOST="${aws_db_instance.rds.address}"
+    export PGPASSWORD="$PG_PASS"
+
+    for DB_NAME in inventory_db payment_db notification_db; do
+      psql -h "$RDS_HOST" -U "$PG_USER" -d order_db -tc \
+        "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" | grep -q 1 \
+        || psql -h "$RDS_HOST" -U "$PG_USER" -d order_db -c "CREATE DATABASE $DB_NAME;"
+    done
+
+    unset PGPASSWORD
+
+    # 5. Run pgAdmin
     docker run -d --name pgadmin --restart unless-stopped \
       -e PGADMIN_DEFAULT_EMAIL=admin@ordersaga.com \
       -e PGADMIN_DEFAULT_PASSWORD=$MQ_ADMIN_PASS \
       -p 5050:80 \
       dpage/pgadmin4:latest
   EOF
+
+  depends_on = [aws_db_instance.rds]
 
   tags = { Name = "order-saga-pgadmin" }
 }

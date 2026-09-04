@@ -18,11 +18,9 @@ output "pgadmin_public_ip" {
   value       = aws_instance.pgadmin.public_ip
 }
 
-output "rds_endpoints" {
-  description = "Endpoints for all RDS instances"
-  value = {
-    for k, v in aws_db_instance.rds : k => v.endpoint
-  }
+output "rds_endpoint" {
+  description = "Endpoint for the shared RDS instance"
+  value       = aws_db_instance.rds.endpoint
 }
 
 output "instructions" {

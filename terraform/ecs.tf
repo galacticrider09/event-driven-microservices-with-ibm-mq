@@ -87,7 +87,7 @@ resource "aws_ecs_task_definition" "app" {
 
       environment = [
         { name = "MQ_HOST", value = aws_instance.mq.private_ip },
-        { name = "DB_HOST", value = aws_db_instance.rds[each.key].address },
+        { name = "DB_HOST", value = aws_db_instance.rds.address },
         { name = "DB_PORT", value = "5432" }
       ]
 

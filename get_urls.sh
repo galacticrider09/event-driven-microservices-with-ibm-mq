@@ -46,16 +46,18 @@ echo "pgAdmin Web UI: http://$PGADMIN_IP:5050"
 echo "Login Email   : admin@ordersaga.com"
 echo "Login Password: POSTGRES_PASSWORD (check systems manager) "
 echo ""
-echo "Database Hostnames (to enter when adding a server in pgAdmin):"
-PRODUCER_DB=$(terraform output -json rds_endpoints | jq -r '.producer')
-INVENTORY_DB=$(terraform output -json rds_endpoints | jq -r '.inventory')
-PAYMENT_DB=$(terraform output -json rds_endpoints | jq -r '.payment')
-NOTIFICATION_DB=$(terraform output -json rds_endpoints | jq -r '.notification')
+echo "Database Hostname (single shared RDS instance — add ONE server in pgAdmin):"
+RDS_ENDPOINT=$(terraform output -raw rds_endpoint)
 
-echo "- Producer DB     : ${PRODUCER_DB%:*}"
-echo "- Inventory DB    : ${INVENTORY_DB%:*}"
-echo "- Payment DB      : ${PAYMENT_DB%:*}"
-echo "- Notification DB : ${NOTIFICATION_DB%:*}"
+echo "- RDS Host        : ${RDS_ENDPOINT%:*}"
+echo "- Port            : 5432"
+echo "- Username        : postgres"
+echo "- Password        : postgres (check systems manager)"
 echo ""
-echo "(Port is 5432, Username is postgres, Password is postgres)"
+echo "Databases inside this instance:"
+echo "  • order_db        (Producer Service)"
+echo "  • inventory_db    (Inventory Service)"
+echo "  • payment_db      (Payment Service)"
+echo "  • notification_db (Notification Service)"
 echo "==========================================="
+
